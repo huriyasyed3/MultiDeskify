@@ -5,8 +5,8 @@ Tauri-based desktop app for running multiple apps in native webviews.
 ---
 
 ## 🚀 Run
-npm install
-npm run tauri dev
+- npm install
+- npm run tauri dev
 
 ---
 
