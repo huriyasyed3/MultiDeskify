@@ -31,4 +31,4 @@ React • Tauri • Rust • Node.js
 ---
 
 ## 📷 Demo
-https://drive.google.com/file/d/1tPkyjyi2sfif5TczXD6_DxFoQZHak9YU/view?usp=sharing
+https://drive.google.com/file/d/1aPSPa5WVbtRfiuEDh6F0QxfhCOP2MYy6/view?usp=drive_link
