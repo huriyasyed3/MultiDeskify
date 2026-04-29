@@ -1,4 +1,4 @@
-# 🖥️ Singlebox Clone
+# 🖥️ MultiDeskify
 
 Tauri-based desktop app for running multiple apps in native webviews.
 

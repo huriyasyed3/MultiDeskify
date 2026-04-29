@@ -1,7 +1,7 @@
 {
-  "productName": "Singlebox",
+  "productName": "MultiDeskify",
   "version": "0.1.0",
-  "identifier": "com.yourcompany.singlebox",
+  "identifier": "com.multideskify.app",
   "build": {
     "beforeDevCommand": "npm run dev",
     "beforeBuildCommand": "npm run build",
@@ -12,7 +12,7 @@
     "withGlobalTauri": true,
     "windows": [
       {
-        "title": "Singlebox",
+        "title": "MultiDeskify",
         "width": 1280,
         "height": 800,
         "minWidth": 900,

@@ -1,10 +1,10 @@
 [package]
-name    = "singlebox"
+name    = "multideskify"
 version = "0.1.0"
 edition = "2021"
 
 [lib]
-name       = "singlebox_lib"
+name       = "multideskify_lib"
 crate-type = ["staticlib", "cdylib", "rlib"]
 
 [build-dependencies]
