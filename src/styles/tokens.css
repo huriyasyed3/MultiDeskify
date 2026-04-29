@@ -1,0 +1,62 @@
+/* ═══════════════════════════════════════════════════════════
+   DESIGN TOKENS
+   All visual values live here. Components never hardcode colors,
+   spacing, or radius — they reference these variables only.
+   ═══════════════════════════════════════════════════════════ */
+
+:root {
+  /* ── Colors ─────────────────────────────────────────────── */
+  --color-bg:           #0a0c14;
+  --color-surface-1:    #10131f;
+  --color-surface-2:    #161929;
+  --color-surface-3:    #1c2035;
+  --color-surface-4:    #222640;
+
+  --color-border:       #1e2540;
+  --color-border-hover: #2a3258;
+
+  --color-accent:       #4f6ef7;
+  --color-accent-dim:   rgba(79, 110, 247, 0.12);
+  --color-accent-glow:  rgba(79, 110, 247, 0.25);
+
+  --color-success:      #22c55e;
+  --color-warning:      #f59e0b;
+  --color-danger:       #ef4444;
+
+  --color-text-1:       #e2e8ff;
+  --color-text-2:       #5a6890;
+  --color-text-3:       #2d3758;
+
+  /* ── Typography ─────────────────────────────────────────── */
+  --font-sans:   'Outfit', system-ui, sans-serif;
+  --font-mono:   'JetBrains Mono', 'Fira Code', monospace;
+
+  --text-xs:     11px;
+  --text-sm:     12.5px;
+  --text-base:   14px;
+  --text-lg:     16px;
+  --text-xl:     19px;
+
+  /* ── Spacing ─────────────────────────────────────────────── */
+  --space-1:  4px;
+  --space-2:  8px;
+  --space-3:  12px;
+  --space-4:  16px;
+  --space-5:  20px;
+  --space-6:  24px;
+
+  /* ── Radius ─────────────────────────────────────────────── */
+  --radius-sm:  6px;
+  --radius-md:  10px;
+  --radius-lg:  14px;
+  --radius-xl:  18px;
+
+  /* ── Layout ─────────────────────────────────────────────── */
+  --sidebar-width:  68px;
+  --topbar-height:  52px;
+
+  /* ── Transitions ─────────────────────────────────────────── */
+  --ease-default: cubic-bezier(0.4, 0, 0.2, 1);
+  --duration-fast: 120ms;
+  --duration-base: 200ms;
+}
