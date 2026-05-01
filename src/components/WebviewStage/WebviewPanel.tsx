@@ -1,63 +1,62 @@
 import { useEffect, useRef, memo } from 'react'
 import { invoke } from '@tauri-apps/api/core'
 import type { AppEntry } from '../../types'
+import { toLabel } from '../Topbar/Topbar'
 
 interface Props {
   app: AppEntry
   isActive: boolean
 }
 
-function toLabel(id: string): string {
-  return 'wv_' + id.replace(/[^a-zA-Z0-9]/g, '_')
-}
-
 const WebviewPanel = memo(({ app, isActive }: Props) => {
-  const created     = useRef(false)
-  const label       = toLabel(app.id)
-  const isActiveRef = useRef(isActive)
+  const createdTabs = useRef<Set<string>>(new Set())
 
-  // Keep ref updated without triggering effects
+  // 🔥 CREATE ALL TABS (IMPORTANT FIX)
   useEffect(() => {
-    isActiveRef.current = isActive
-  })
+    app.tabs.forEach(async (tab) => {
+      const label = toLabel(app.id, tab.id)
 
-  // Create webview once — then show if active
-  useEffect(() => {
-    if (created.current) return
+      if (createdTabs.current.has(label)) return
 
-    const init = async () => {
       try {
         await invoke('create_app_webview', {
-          payload: { id: app.id, url: app.url, label }
+          payload: { id: app.id, url: tab.url, label }
         })
-        created.current = true
 
-        // Show immediately if this is the active app
-        if (isActiveRef.current) {
+        createdTabs.current.add(label)
+      } catch (err) {
+        console.error('Create error:', err)
+      }
+    })
+  }, [app.tabs, app.id])
+
+  // 🔥 SHOW ACTIVE TAB / HIDE OTHERS
+  useEffect(() => {
+    app.tabs.forEach(async (tab) => {
+      const label = toLabel(app.id, tab.id)
+
+      if (!createdTabs.current.has(label)) return
+
+      try {
+        if (isActive && tab.id === app.activeTabId) {
           await invoke('show_app_webview', { label })
+        } else {
+          await invoke('hide_app_webview', { label })
         }
       } catch (err) {
-        console.error(`[WebviewPanel] Failed to create ${app.name}:`, err)
+        console.error(err)
       }
-    }
+    })
+  }, [app.activeTabId, isActive, app.tabs, app.id])
 
-    init()
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [])
-
-  // Show or hide when active state changes
-  useEffect(() => {
-    if (!created.current) return
-    const cmd = isActive ? 'show_app_webview' : 'hide_app_webview'
-    invoke(cmd, { label }).catch(console.error)
-  }, [isActive, label])
-
-  // Cleanup when app is removed from store
+  // 🔥 DESTROY ON UNMOUNT ONLY
   useEffect(() => {
     return () => {
-      invoke('destroy_app_webview', { label }).catch(() => {})
+      createdTabs.current.forEach(label => {
+        invoke('destroy_app_webview', { label }).catch(() => {})
+      })
     }
-  }, [label])
+  }, [])
 
   return null
 })

@@ -8,6 +8,36 @@ pub struct AppPayload {
     pub label: String,
 }
 
+// ─────────────────────────────────────────────
+// CORE LAYOUT FIX (IMPORTANT PART)
+// ─────────────────────────────────────────────
+fn get_bounds(main: &tauri::WebviewWindow) -> Result<(f64, f64, f64, f64), String> {
+    let scale      = main.scale_factor().map_err(|e| e.to_string())?;
+    let outer_pos  = main.outer_position().map_err(|e| e.to_string())?;
+    let outer_size = main.outer_size().map_err(|e| e.to_string())?;
+    let inner_size = main.inner_size().map_err(|e| e.to_string())?;
+
+    // Title bar height in physical pixels
+    let titlebar_h = (outer_size.height as i32 - inner_size.height as i32).max(0) as f64;
+
+    // CSS se confirmed values (logical pixels):
+    // sidebar = 68px, topbar+tabs = 80px
+    let sidebar_px: f64 = 68.0 * scale;
+    let topbar_px:  f64 = 80.0 * scale;
+
+    // Screen position in logical pixels
+    let x = (outer_pos.x as f64 + sidebar_px) / scale;
+    let y = (outer_pos.y as f64 + titlebar_h) / scale + 80.0;
+
+    // Size in logical pixels
+    let w = (inner_size.width  as f64 / scale) - 68.0;
+    let h = (inner_size.height as f64 / scale) - 80.0;
+
+    Ok((x, y, w, h))
+}
+// ─────────────────────────────────────────────
+// CREATE WEBVIEW
+// ─────────────────────────────────────────────
 #[tauri::command]
 async fn create_app_webview(
     app: AppHandle,
@@ -21,17 +51,7 @@ async fn create_app_webview(
         .get_webview_window("main")
         .ok_or("main window not found")?;
 
-    let pos   = main.inner_position().map_err(|e| e.to_string())?;
-    let size  = main.inner_size().map_err(|e| e.to_string())?;
-    let scale = main.scale_factor().map_err(|e| e.to_string())?;
-
-    let sidebar_px = (68.0 * scale) as i32;
-    let topbar_px  = (52.0 * scale) as i32;
-
-    let x = (pos.x + sidebar_px) as f64 / scale;
-    let y = (pos.y + topbar_px)  as f64 / scale;
-    let w = (size.width  as i32 - sidebar_px) as f64 / scale;
-    let h = (size.height as i32 - topbar_px)  as f64 / scale;
+    let (x, y, w, h) = get_bounds(&main)?;
 
     let parsed = payload
         .url
@@ -55,6 +75,9 @@ async fn create_app_webview(
     Ok(())
 }
 
+// ─────────────────────────────────────────────
+// SHOW WEBVIEW
+// ─────────────────────────────────────────────
 #[tauri::command]
 async fn show_app_webview(
     app: AppHandle,
@@ -67,6 +90,9 @@ async fn show_app_webview(
     Ok(())
 }
 
+// ─────────────────────────────────────────────
+// HIDE WEBVIEW
+// ─────────────────────────────────────────────
 #[tauri::command]
 async fn hide_app_webview(
     app: AppHandle,
@@ -78,6 +104,9 @@ async fn hide_app_webview(
     Ok(())
 }
 
+// ─────────────────────────────────────────────
+// DESTROY WEBVIEW
+// ─────────────────────────────────────────────
 #[tauri::command]
 async fn destroy_app_webview(
     app: AppHandle,
@@ -89,6 +118,9 @@ async fn destroy_app_webview(
     Ok(())
 }
 
+// ─────────────────────────────────────────────
+// RELOAD WEBVIEW
+// ─────────────────────────────────────────────
 #[tauri::command]
 async fn reload_app_webview(
     app: AppHandle,
@@ -101,6 +133,9 @@ async fn reload_app_webview(
     Ok(())
 }
 
+// ─────────────────────────────────────────────
+// SYNC POSITION (SAFE + STABLE)
+// ─────────────────────────────────────────────
 #[tauri::command]
 async fn sync_webview_position(
     app: AppHandle,
@@ -110,17 +145,7 @@ async fn sync_webview_position(
         .get_webview_window("main")
         .ok_or("main window not found")?;
 
-    let pos   = main.inner_position().map_err(|e| e.to_string())?;
-    let size  = main.inner_size().map_err(|e| e.to_string())?;
-    let scale = main.scale_factor().map_err(|e| e.to_string())?;
-
-    let sidebar_px = (68.0 * scale) as i32;
-    let topbar_px  = (52.0 * scale) as i32;
-
-    let x = (pos.x + sidebar_px) as f64 / scale;
-    let y = (pos.y + topbar_px)  as f64 / scale;
-    let w = (size.width  as i32 - sidebar_px) as f64 / scale;
-    let h = (size.height as i32 - topbar_px)  as f64 / scale;
+    let (x, y, w, h) = get_bounds(&main)?;
 
     if let Some(wv) = app.get_webview_window(&label) {
         wv.set_position(tauri::LogicalPosition::new(x, y))
@@ -133,6 +158,9 @@ async fn sync_webview_position(
     Ok(())
 }
 
+// ─────────────────────────────────────────────
+// RUN APP
+// ─────────────────────────────────────────────
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()

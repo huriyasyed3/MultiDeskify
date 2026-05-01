@@ -11,6 +11,7 @@
   position: relative;
   overflow: hidden;
   z-index: 10;
+  box-sizing: border-box;
 }
 
 /* Subtle accent line on right edge */
