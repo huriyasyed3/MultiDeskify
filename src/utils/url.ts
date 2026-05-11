@@ -1,7 +1,7 @@
 // ─── ID generation ─────────────────────────────────────────────────────────
 
 export function generateId(): string {
-  return `app_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`
+  return Math.random().toString(36).slice(2, 7)
 }
 
 // ─── URL utilities ─────────────────────────────────────────────────────────

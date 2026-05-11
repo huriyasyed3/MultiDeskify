@@ -22,17 +22,22 @@ const WebviewPanel = memo(({ app, isActive }: Props) => {
   const createdTabs = useRef<Set<string>>(new Set())
   const creating    = useRef<Set<string>>(new Set())
 
-  // ── Create all tabs for this app ───────────────────────────
+  // ── Create webview for active tab only (lazy loading) ─────
   useEffect(() => {
-    app.tabs.forEach(async (tab) => {
-      const label = toLabel(app.id, tab.id)
+    if (!isActive || !app.activeTabId) return
 
-      // Skip if already created or currently creating
-      if (createdTabs.current.has(label)) return
-      if (creating.current.has(label))    return
+    const tab = app.tabs.find(t => t.id === app.activeTabId)
+    if (!tab) return
 
-      creating.current.add(label)
+    const label = toLabel(app.id, tab.id)
 
+    // Skip if already created or currently creating
+    if (createdTabs.current.has(label)) return
+    if (creating.current.has(label))    return
+
+    creating.current.add(label)
+
+    ;(async () => {
       try {
         // Create webview window via Rust backend
         await invoke('create_app_webview', {
@@ -56,8 +61,8 @@ const WebviewPanel = memo(({ app, isActive }: Props) => {
       } finally {
         creating.current.delete(label)
       }
-    })
-  }, [app.id, app.tabs])
+    })()
+  }, [app.id, app.activeTabId, isActive])
 
   // ── Show/hide active tab ───────────────────────────────────
   useEffect(() => {
@@ -65,30 +70,20 @@ const WebviewPanel = memo(({ app, isActive }: Props) => {
 
     const label = toLabel(app.id, app.activeTabId)
 
-    // Only proceed if webview has been created
+    // Only proceed if webview exists
     if (!createdTabs.current.has(label)) return
 
     if (isActive) {
-      // ═══════════════════════════════════════════════════════════
-      // ATOMIC SYNC-AND-SHOW OPERATION
-      // ═══════════════════════════════════════════════════════════
-      //
-      // Pass measurements to Rust so it can:
-      // 1. Sync position while webview is hidden
-      // 2. Show webview at correct position
-      // 3. Hide others immediately
-      //
-      // This atomic operation prevents any visual artifacts
-      // ═══════════════════════════════════════════════════════════
-
+      // This app is active - show its active tab
       const { sidebarWidth, topbarHeight } = getLayout()
 
-      // Single atomic operation: sync + show
-      invoke('show_app_webview', {
-        label,
-        sidebarWidth,
-        topbarHeight
-      }).catch(console.error)
+      // Sync position before showing (handles window move/resize)
+      invoke('sync_webview_position', { label, sidebarWidth, topbarHeight })
+        .catch(() => {})
+        .finally(() => {
+          // Show webview (Rust will hide others automatically)
+          invoke('show_app_webview', { label }).catch(console.error)
+        })
     } else {
       // This app is not active - hide its webview
       invoke('hide_app_webview', { label }).catch(() => {})

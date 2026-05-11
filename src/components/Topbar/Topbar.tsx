@@ -4,8 +4,19 @@ import { useAppStore } from '../../store/useAppStore'
 import { validateAndNormalizeUrl } from '../../utils/url'
 import './Topbar.css'
 
+// Generate unique webview label from app ID and tab ID
 export function toLabel(appId: string, tabId: string): string {
   return 'wv_' + (appId + '_' + tabId).replace(/[^a-zA-Z0-9]/g, '_')
+}
+
+// Get exact DOM measurements for Rust positioning
+function getLayout() {
+  const sidebar = document.querySelector('.sidebar') as HTMLElement
+  const topbar  = document.querySelector('.topbar')  as HTMLElement
+  return {
+    sidebarWidth: sidebar?.offsetWidth  ?? 68,
+    topbarHeight: topbar?.offsetHeight  ?? 80,
+  }
 }
 
 export default function Topbar() {
@@ -28,85 +39,145 @@ export default function Topbar() {
   const nameRef = useRef<HTMLInputElement>(null)
   const urlRef  = useRef<HTMLInputElement>(null)
 
+  // Auto-focus rename input
   useEffect(() => {
-    if (renaming)  setTimeout(() => nameRef.current?.focus(), 50)
+    if (renaming) setTimeout(() => nameRef.current?.focus(), 50)
   }, [renaming])
 
+  // Auto-focus URL input
   useEffect(() => {
     if (addingTab) setTimeout(() => urlRef.current?.focus(), 50)
   }, [addingTab])
 
+  // ── Start rename ───────────────────────────────────────────
   const startRename = useCallback(() => {
     if (!activeApp) return
     setNewName(activeApp.name)
     setRenaming(true)
   }, [activeApp])
 
+  // ── Submit rename ──────────────────────────────────────────
   const submitRename = useCallback(() => {
-    if (activeId && newName.trim()) renameApp(activeId, newName.trim())
+    if (activeId && newName.trim()) {
+      renameApp(activeId, newName.trim())
+    }
     setRenaming(false)
   }, [activeId, newName, renameApp])
 
+  // ── Tab switch - smooth, no flicker ────────────────────────
   const handleTabSwitch = useCallback((tabId: string) => {
     if (!activeId) return
+
+    // Update store immediately - WebviewPanel will handle show/hide
     switchTab(activeId, tabId)
-    const label = toLabel(activeId, tabId)
-    invoke('show_app_webview', { label }).catch(console.error)
   }, [activeId, switchTab])
 
+  // ── Add new tab ────────────────────────────────────────────
   const handleAddTab = useCallback(async () => {
     if (!activeId) return
+
+    // Validate URL
     const result = validateAndNormalizeUrl(tabUrl)
-    if (!result.ok) { setUrlError(result.error || 'Invalid URL'); return }
+    if (!result.ok) {
+      setUrlError(result.error || 'Invalid URL')
+      return
+    }
+
     const url   = result.normalizedUrl!
     const title = new URL(url).hostname.replace('www.', '')
+
+    // Add to store
     addTab(activeId, url, title)
+
+    // Wait for store update
     await new Promise(r => setTimeout(r, 50))
+
+    // Get the newly created tab
     const currentApp = useAppStore.getState().apps.find(a => a.id === activeId)
     if (!currentApp) return
+
     const newTab = currentApp.tabs[currentApp.tabs.length - 1]
     if (!newTab) return
+
     const label = toLabel(activeId, newTab.id)
+    const { sidebarWidth, topbarHeight } = getLayout()
+
     try {
-      await invoke('create_app_webview', { payload: { id: activeId, url, label } })
+      // Create webview
+      await invoke('create_app_webview', {
+        payload: { id: activeId, url, label }
+      })
+
+      // Sync position
+      await invoke('sync_webview_position', {
+        label,
+        sidebarWidth,
+        topbarHeight
+      })
+
+      // Show it
       await invoke('show_app_webview', { label })
-    } catch (err) { console.error('Tab create error:', err) }
+    } catch (err) {
+      console.error('Tab create error:', err)
+    }
+
+    // Reset form
     setAddingTab(false)
     setTabUrl('')
     setUrlError('')
   }, [activeId, tabUrl, addTab])
 
+  // ── Remove tab ─────────────────────────────────────────────
   const handleRemoveTab = useCallback(async (tabId: string) => {
     if (!activeId || !activeApp) return
+
+    // If last tab, remove entire app
     if (activeApp.tabs.length === 1) {
       if (window.confirm(`Remove "${activeApp.name}"?`)) {
+        // Destroy all webviews
         for (const tab of activeApp.tabs) {
-          await invoke('destroy_app_webview', { label: toLabel(activeId, tab.id) }).catch(() => {})
+          await invoke('destroy_app_webview', {
+            label: toLabel(activeId, tab.id)
+          }).catch(() => {})
         }
         removeApp(activeId)
       }
       return
     }
-    await invoke('destroy_app_webview', { label: toLabel(activeId, tabId) }).catch(() => {})
+
+    // Destroy this tab's webview
+    await invoke('destroy_app_webview', {
+      label: toLabel(activeId, tabId)
+    }).catch(() => {})
+
+    // Remove from store
     removeTab(activeId, tabId)
+
+    // Switch to last remaining tab
     const remaining = activeApp.tabs.filter(t => t.id !== tabId)
     if (remaining.length > 0) {
       const next = remaining[remaining.length - 1]
+      // Update store - WebviewPanel will handle showing the webview
       switchTab(activeId, next.id)
-      await invoke('show_app_webview', { label: toLabel(activeId, next.id) }).catch(console.error)
     }
   }, [activeId, activeApp, removeApp, removeTab, switchTab])
 
+  // ── Remove entire app ──────────────────────────────────────
   const handleRemoveApp = useCallback(async () => {
     if (!activeId || !activeApp) return
+
     if (window.confirm(`Remove "${activeApp.name}" and all tabs?`)) {
+      // Destroy all webviews
       for (const tab of activeApp.tabs) {
-        await invoke('destroy_app_webview', { label: toLabel(activeId, tab.id) }).catch(() => {})
+        await invoke('destroy_app_webview', {
+          label: toLabel(activeId, tab.id)
+        }).catch(() => {})
       }
       removeApp(activeId)
     }
   }, [activeId, activeApp, removeApp])
 
+  // ── Empty state ────────────────────────────────────────────
   if (!activeApp) {
     return (
       <header className="topbar">
@@ -118,10 +189,11 @@ export default function Topbar() {
     )
   }
 
+  // ── Active app UI ──────────────────────────────────────────
   return (
     <header className="topbar">
 
-      {/* ── Row 1 — App info + Actions (52px) ─────────────── */}
+      {/* Row 1: App info + Actions (52px) */}
       <div className="topbar-row-1">
         <div className="tb-app-info">
           <span className="tb-status-dot ready" />
@@ -167,7 +239,7 @@ export default function Topbar() {
         </div>
       </div>
 
-      {/* ── Row 2 — Tabs (28px) ────────────────────────────── */}
+      {/* Row 2: Tabs (28px) */}
       <div className="topbar-row-2">
         <div className="tb-tabs">
           {activeApp.tabs.map(tab => (
